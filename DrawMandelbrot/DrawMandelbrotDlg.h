@@ -29,11 +29,10 @@ protected:
 	DECLARE_MESSAGE_MAP()
 
 private:
-	double m_Left, m_Right, m_Top, m_Bottom;
-	CPoint m_MouseDownPoi;
+	double m_left, m_right, m_top, m_bottom;
+	CPoint m_MouseDownPoint;
 	BOOL Draw();
 	afx_msg BOOL OnMouseWheel(UINT nFlags, short zDelta, CPoint pt);
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
-	afx_msg void OnMove(int x, int y);
 };

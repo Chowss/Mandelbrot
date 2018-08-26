@@ -31,7 +31,6 @@ BEGIN_MESSAGE_MAP(CDrawMandelbrotDlg, CDialog)
 	ON_WM_MOUSEWHEEL()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
-	ON_WM_MOVE()
 END_MESSAGE_MAP()
 
 
@@ -48,10 +47,10 @@ BOOL CDrawMandelbrotDlg::OnInitDialog()
 
 	// TODO: Add extra initialization here
 
-	m_Left = -2.0;
-	m_Right = 1.0;
-	m_Top = 1.5;
-	m_Bottom = -1.0;
+	m_left = -2.0;
+	m_right = 1.0;
+	m_top = 1.5;
+	m_bottom = -1.0;
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -100,23 +99,23 @@ BOOL CDrawMandelbrotDlg::Draw()
 {
 	CRect rect;
 	GetWindowRect(&rect);
-	int iWidth = rect.Width();
-	int iHeight = rect.Height();
+	int width = rect.Width();
+	int height = rect.Height();
 
-	m_Top  = m_Bottom + (m_Right - m_Left) * iHeight / iWidth;
+	m_top  = m_bottom + (m_right - m_left) * height / width;
 
 	CClientDC dc(this);
 	CDC memDC;
 	memDC.CreateCompatibleDC(&dc);
 
 	CBitmap bmp;
-	bmp.CreateCompatibleBitmap(&dc, iWidth, iHeight);
+	bmp.CreateCompatibleBitmap(&dc, width, height);
 	memDC.SelectObject(&bmp);
 
 	BITMAPINFO bmpInfo; 
 	bmpInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);  
-	bmpInfo.bmiHeader.biWidth = iWidth; 
-	bmpInfo.bmiHeader.biHeight = -iHeight;
+	bmpInfo.bmiHeader.biWidth = width; 
+	bmpInfo.bmiHeader.biHeight = -height;
 	bmpInfo.bmiHeader.biPlanes = 1;  
 	bmpInfo.bmiHeader.biBitCount = 24;  
 	bmpInfo.bmiHeader.biCompression = BI_RGB;  
@@ -126,57 +125,55 @@ BOOL CDrawMandelbrotDlg::Draw()
 	bmpInfo.bmiHeader.biClrUsed = 0;  
 	bmpInfo.bmiHeader.biClrImportant = 0;  
 
-	long nLnBytes = (bmpInfo.bmiHeader.biWidth*3+3)/4*4;
-	BYTE *pData = new BYTE[nLnBytes*abs(bmpInfo.bmiHeader.biHeight)];
+	long bytesPerLine = (bmpInfo.bmiHeader.biWidth * 3 + 3) / 4 * 4;
+	long bufferSize = bytesPerLine * height;
 
-	memset(pData, 0, nLnBytes*abs(bmpInfo.bmiHeader.biHeight));
+	BYTE *buffer = new BYTE[bufferSize];
+	memset(buffer, 0, bufferSize);
 
-	int iMaxLoop = 1500;
+	int maxLoop = 1500;
 
-	double dWidthZ = m_Right - m_Left;
-	double dHeightZ = m_Top - m_Bottom;
+	double w = m_right - m_left;
+	double h = m_top - m_bottom;
 
 	int iTmp = -1;
 	int index = -1;
 	#pragma omp parallel for
-	for (int i = 0; i < iWidth; ++i)
+	for (int i = 0; i < width; ++i)
 	{
-		for (int j = 0; j < iHeight; ++j)
+		for (int j = 0; j < height; ++j)
 		{
 			ComplexNum z;
 			ComplexNum c;
 			double dTmp;
 
-			int iLoop = 0;
-			z.real = 0;
-			z.imag = 0;
-			c.real = dWidthZ * (i + 1) / iWidth + m_Left;
-			c.imag = dHeightZ * (j + 1) / iHeight + m_Bottom;
+			int loopCount = 0;
+			c.real = w * (i + 1) / width + m_left;
+			c.imag = h * (j + 1) / height + m_bottom;
 			
-			int iTmp = 0;
-
 			do
 			{
 				dTmp = z.real * z.real - z.imag * z.imag + c.real;
 				z.imag = 2 * z.real * z.imag + c.imag;
 				z.real = dTmp;
-			} while((z.real * z.real + z.imag * z.imag) < 4 && (++iLoop < iMaxLoop) );
+				++loopCount;
+			} while((z.real * z.real + z.imag * z.imag) < 4 && loopCount < maxLoop);
 
-			if (iLoop != iMaxLoop)
+			if (loopCount != maxLoop)
 			{
-
-				iTmp = iLoop  % 255;
-				index = j * nLnBytes + i * 3;
-				pData[index++] = iTmp;
-				pData[index++] = iTmp * 5;
-				pData[index] = iTmp * 10;
+				int iTmp = loopCount  % 255;
+				index = j * bytesPerLine + i * 3;
+				buffer[index] = iTmp;
+				buffer[index + 1] = iTmp * 5;
+				buffer[index + 2] = iTmp * 10;
 			}
 		}
 	}
 
-	SetDIBits(dc.m_hDC, bmp, 0, abs(bmpInfo.bmiHeader.biHeight), pData, &bmpInfo, DIB_RGB_COLORS);
-	delete []pData;
-	dc.BitBlt(0, 0, bmpInfo.bmiHeader.biWidth, abs(bmpInfo.bmiHeader.biHeight), &memDC, 0, 0, SRCCOPY);
+	SetDIBits(dc.m_hDC, bmp, 0, height, buffer, &bmpInfo, DIB_RGB_COLORS);
+	delete []buffer;
+
+	dc.BitBlt(0, 0, bmpInfo.bmiHeader.biWidth, height, &memDC, 0, 0, SRCCOPY);
 
 	return true;
 }
@@ -184,16 +181,15 @@ BOOL CDrawMandelbrotDlg::Draw()
 
 BOOL CDrawMandelbrotDlg::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 {
-	// TODO: Add your message handler code here and/or call default
-
 	CRect rect;
 	GetWindowRect(&rect);
-	int iWidth = rect.Width();
-	int iHeight = rect.Height();
+	int canvasW = rect.Width();
+	int cnavasH = rect.Height();
 
-	double dWidthZ = m_Right - m_Left;
-	double dHeightZ = m_Top - m_Bottom;
-
+	double w = m_right - m_left;
+	double h = m_top - m_bottom;
+	double deltaW = w / 4;
+	double deltaH = h / 4;
 	ScreenToClient(&pt);
 
 	CRect crect;
@@ -201,21 +197,22 @@ BOOL CDrawMandelbrotDlg::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 
 	if (zDelta > 0)
 	{
-		m_Left += dWidthZ * (pt.x - iWidth / 2) / iWidth;
-		m_Right += dWidthZ * (pt.x - iWidth / 2) / iWidth;
-		m_Top += dHeightZ * (pt.y - iHeight / 2) / iHeight;
-		m_Bottom += dHeightZ * (pt.y - iHeight / 2) / iHeight;
+		m_left += w * (pt.x - canvasW / 2) / canvasW;
+		m_right += w * (pt.x - canvasW / 2) / canvasW;
+		m_top += h * (pt.y - cnavasH / 2) / cnavasH;
+		m_bottom += h * (pt.y - cnavasH / 2) / cnavasH;
 
-		m_Left += dWidthZ / 4;
-		m_Right -= dWidthZ / 4;
-		m_Top -= dHeightZ / 4;
-		m_Bottom += dHeightZ / 4;
-	} else if (zDelta < 0)
+		m_left += deltaW;
+		m_right -= deltaW;
+		m_top -= deltaH;
+		m_bottom += deltaH;
+	}
+	else if (zDelta < 0)
 	{
-		m_Left -= dWidthZ / 4;
-		m_Right += dWidthZ / 4;
-		m_Top += dHeightZ / 4;
-		m_Bottom -= dHeightZ / 4;
+		m_left -= deltaW;
+		m_right += deltaW;
+		m_top += deltaH;
+		m_bottom -= deltaH;
 	}
 	Draw();
 
@@ -224,36 +221,21 @@ BOOL CDrawMandelbrotDlg::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
 
 void CDrawMandelbrotDlg::OnLButtonDown(UINT nFlags, CPoint point)
 {
-	// TODO: Add your message handler code here and/or call default
-	m_MouseDownPoi = point;
-
-	CDialog::OnLButtonDown(nFlags, point);
+	m_MouseDownPoint = point;
 }
 
 void CDrawMandelbrotDlg::OnLButtonUp(UINT nFlags, CPoint point)
 {
-	// TODO: Add your message handler code here and/or call default
-	double dWidthZ = m_Right - m_Left;
-	double dHeightZ = m_Top - m_Bottom;
-
 	CRect rect;
 	GetWindowRect(&rect);
-	int iWidth = rect.Width();
-	int iHeight = rect.Height();
+	
+	double deltaX = m_right - m_left * (point.x - m_MouseDownPoint.x) / rect.Width();
+	double deltaY = m_top - m_bottom * (point.y - m_MouseDownPoint.y) / rect.Height();
 
-	m_Left -= dWidthZ * (point.x - m_MouseDownPoi.x) / iWidth;
-	m_Right -= dWidthZ * (point.x - m_MouseDownPoi.x) / iWidth;
-	m_Top -= dHeightZ * (point.y - m_MouseDownPoi.y) / iHeight;
-	m_Bottom -= dHeightZ * (point.y - m_MouseDownPoi.y) / iHeight;
+	m_left -= deltaX;
+	m_right -= deltaX;
+	m_top -= deltaY;
+	m_bottom -= deltaY;
 
 	Draw();
-
-	CDialog::OnLButtonUp(nFlags, point);
-}
-
-void CDrawMandelbrotDlg::OnMove(int x, int y)
-{
-	CDialog::OnMove(x, y);
-
-	// TODO: Add your message handler code here
 }
